@@ -556,10 +556,9 @@ void PrintExceptionContinue(const std::exception* pex, const char* pszThread)
 
 fs::path GetDefaultDataDir()
 {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\LitecoinZ
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\LitecoinZ
-    // Mac: ~/Library/Application Support/LitecoinZ
-    // Unix: ~/.litecoinz
+    // Windows: C:\Users\Username\AppData\Roaming\LitecoinZ
+    // macOS: ~/Library/Application Support/LitecoinZ
+    // Unix-like: ~/.litecoinz
 #ifdef WIN32
     // Windows
     return GetSpecialFolderPath(CSIDL_APPDATA) / "LitecoinZ";
@@ -571,10 +570,10 @@ fs::path GetDefaultDataDir()
     else
         pathRet = fs::path(pszHome);
 #ifdef MAC_OSX
-    // Mac
+    // macOS
     return pathRet / "Library/Application Support/LitecoinZ";
 #else
-    // Unix
+    // Unix-like
     return pathRet / ".litecoinz";
 #endif
 #endif
