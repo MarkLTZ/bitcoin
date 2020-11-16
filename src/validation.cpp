@@ -1152,6 +1152,10 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
     if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
+    // Check Equihash solution
+    if (!CheckEquihashSolution(&block))
+        return error("ReadBlockFromDisk: Errors in block header at %s (bad Equihash solution)", pos.ToString());
+
     return true;
 }
 
@@ -3269,6 +3273,23 @@ static bool FindUndoPos(BlockValidationState &state, int nFile, FlatFilePos &pos
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
+    // Check block version
+    if (block.nVersion < MIN_BLOCK_VERSION)
+        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "version-too-low", "block version too low");
+
+    // Check Equihash solution is valid
+    if (fCheckPOW) {
+        const CChainParams& chainparams = Params();
+        size_t oldSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight());
+        size_t newSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight() - 1);
+
+        if ((block.nSolution.size() != oldSize) && (block.nSolution.size() != newSize))
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-solution-size", "invalid equihash solution size");
+
+        if (!CheckEquihashSolution(&block))
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-solution", "invalid equihash solution");
+    }
+
     // Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
