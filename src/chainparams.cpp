@@ -69,9 +69,9 @@ public:
         consensus.BIP34Enabled = true;
         consensus.BIP65Enabled = true;
         consensus.BIP66Enabled = true;
-        consensus.CSVHeight = 419328; // 000000000000000004a1b34462cb8aeebd5799177f7a29cf28f2d1961716b5b5
-        consensus.SegwitHeight = 481824; // 0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893
-        consensus.MinBIP9WarningHeight = 483840; // segwit activation height + miner confirmation window
+        consensus.CSVHeight = 585000;
+        consensus.SegwitHeight = 590000;
+        consensus.MinBIP9WarningHeight = 592016; // segwit activation height + miner confirmation window
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
         consensus.nDigishieldTargetSpacing = 2.5 * 60;
@@ -137,7 +137,6 @@ public:
         // This is fine at runtime as we'll fall back to using them as a oneshot if they don't support the
         // service bits we want, but we should get them updated to support all service bits wanted by any
         // release ASAP to avoid it where possible.
-        vSeeds.emplace_back("dnsseed.litecoinz.info");
         vSeeds.emplace_back("dnsseed.litecoinz.org");
 
         // guarantees the first 2 characters, when base58 encoded, are "L1"
@@ -179,6 +178,7 @@ public:
         };
 
         chainTxData = ChainTxData{
+            // Data from RPC: getchaintxstats 4096 00000000000000000005f8920febd3925f8272a6a71237563d78c2edfdd09ddf
             /* nTime    */ 1529323588,
             /* nTxCount */ 95703,
             /* dTxRate  */ 1600,
@@ -198,9 +198,9 @@ public:
         consensus.BIP34Enabled = true;
         consensus.BIP65Enabled = true;
         consensus.BIP66Enabled = true;
-        consensus.CSVHeight = 770112; // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
-        consensus.SegwitHeight = 834624; // 00000000002b980fcd729daaa248fd9316a5200e9b367f4ff2c42453e84201ca
-        consensus.MinBIP9WarningHeight = 836640; // segwit activation height + miner confirmation window
+        consensus.CSVHeight = 5500;
+        consensus.SegwitHeight = 6150;
+        consensus.MinBIP9WarningHeight = 8166; // segwit activation height + miner confirmation window
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
         consensus.nDigishieldTargetSpacing = 2.5 * 60;
@@ -235,7 +235,7 @@ public:
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000f1eb9b");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x00000000000000b7ab6ce61eb6d571003fbe5fe892da4c9b740c49a07542462d"); // 1580000
+        consensus.defaultAssumeValid = uint256S("0x000382f922603bec442e45c4d25529bb0ab4340d88228775a3b883ecfc94fa51"); // 4180
 
         pchMessageStart[0] = 0xfe;
         pchMessageStart[1] = 0x90;
@@ -259,7 +259,6 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("dnsseed-testnet.litecoinz.info");
         vSeeds.emplace_back("dnsseed-testnet.litecoinz.org");
 
         // guarantees the first 2 characters, when base58 encoded, are "T1"
@@ -283,13 +282,15 @@ public:
         checkpointData = {
             {
                 {0, uint256S("0x000777e63f7c2efb3c554405a07a4f3dd1def8ea5cef4fda65b2c57247171141")},
+                {4959, uint256S("0x00018e8ba19c3e8841ea67dffba6dcf4fa43d2ae951bf9cec854570acef8b456")},
             }
         };
 
         chainTxData = ChainTxData{
-            /* nTime    */ 1511954736,
-            /* nTxCount */ 1,
-            /* dTxRate  */ 0.1517002392872353,
+            // Data from RPC: getchaintxstats 4096 00018e8ba19c3e8841ea67dffba6dcf4fa43d2ae951bf9cec854570acef8b456
+            /* nTime    */ 1588208103,
+            /* nTxCount */ 8492,
+            /* dTxRate  */ 0.0001216201489260297,
         };
     }
 };
