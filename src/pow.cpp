@@ -17,57 +17,58 @@
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     assert(pindexLast != nullptr);
+    int nHeight = pindexLast->nHeight + 1;
+
+    if (params.fPowNoRetargeting)
+        return pindexLast->nBits;
+
+    if (nHeight < params.nLwmaForkHeight) {
+        // Regular Digishield v3.
+        return DigishieldGetNextWorkRequired(pindexLast, pblock, params);
+    } else {
+        // Zawy's LWMA.
+        return LwmaGetNextWorkRequired(pindexLast, pblock, params);
+    }
+}
+
+unsigned int DigishieldGetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+{
+    assert(pindexLast != nullptr);
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
 
-    LogPrint(BCLog::POW, "pindexLast->nHeight=%d, params.nEquihashForkHeight=%d params.nPowAveragingWindow=%d\n",
-             pindexLast->nHeight, params.nEquihashForkHeight, params.nPowAveragingWindow);
+    LogPrint(BCLog::POW, "pindexLast->nHeight=%d, params.nEquihashForkHeight=%d params.nDigishieldAveragingWindow=%d\n",
+             pindexLast->nHeight, params.nEquihashForkHeight, params.nDigishieldAveragingWindow);
 
     if (params.fPowAllowMinDifficultyBlocks) {
         // Special difficulty rule for testnet:
-        // If the new block's timestamp is more than 2* 10 minutes
+        // If the new block's timestamp is more than 6 * 2.5 minutes
         // then allow mining of a min-difficulty block.
-        if (pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing*2)
+        if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nDigishieldTargetSpacing * 6)
             return nProofOfWorkLimit;
-    } else {
-        // Reset the difficulty after the algo fork for testnet and regtest
-        if (Params().NetworkIDString() != CBaseChainParams::MAIN) {
-            if (((pindexLast->nHeight + 1) >= params.nEquihashForkHeight) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nPowAveragingWindow))
-            {
-                LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
-                return nProofOfWorkLimit;
-            }
-        } else {
-            // Reset the difficulty after the algo fork
-            if (((pindexLast->nHeight + 1) >= 95005) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nPowAveragingWindow)) {
-                LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
-                return nProofOfWorkLimit;
-            }
-        }
+    }
 
-        // Reset the difficulty after the algo fork for testnet and regtest
-        if (Params().NetworkIDString() != CBaseChainParams::MAIN) {
-            if (((pindexLast->nHeight + 1) >= params.nEquihashForkHeight) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nPowAveragingWindow))
-            {
-                LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
-                return nProofOfWorkLimit;
-            }
-        } else {
-            // Reset the difficulty after the algo fork
-            if (((pindexLast->nHeight + 1) >= 95005) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nPowAveragingWindow)) {
-                LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
-                return nProofOfWorkLimit;
-            }
+    // Reset the difficulty after the algo fork for testnet and regtest
+    if (Params().NetworkIDString() != CBaseChainParams::MAIN) {
+        if (((pindexLast->nHeight + 1) >= params.nEquihashForkHeight) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nDigishieldAveragingWindow)) {
+            LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
+            return nProofOfWorkLimit;
+        }
+    } else {
+        // Reset the difficulty after the algo fork
+        if (((pindexLast->nHeight + 1) >= 95005) && (pindexLast->nHeight < params.nEquihashForkHeight + params.nDigishieldAveragingWindow)) {
+            LogPrint(BCLog::POW, "Reset the difficulty for the algorithm change: %d\n", nProofOfWorkLimit);
+            return nProofOfWorkLimit;
         }
     }
 
     // Find the first block in the averaging interval
     const CBlockIndex* pindexFirst = pindexLast;
     arith_uint256 bnTot {0};
-    for (int i = 0; pindexFirst && i < params.nPowAveragingWindow; i++) {
+    for (int i = 0; pindexFirst && i < params.nDigishieldAveragingWindow; i++) {
         arith_uint256 bnTmp;
         bnTmp.SetCompact(pindexFirst->nBits);
         bnTot += bnTmp;
@@ -78,31 +79,29 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (pindexFirst == NULL)
         return nProofOfWorkLimit;
 
-    arith_uint256 bnAvg {bnTot / params.nPowAveragingWindow};
+    arith_uint256 bnAvg {bnTot / params.nDigishieldAveragingWindow};
 
-    return CalculateNextWorkRequired(pindexLast, bnAvg, pindexFirst->GetMedianTimePast(), params);
+    return DigishieldCalculateNextWorkRequired(pindexLast, bnAvg, pindexFirst->GetMedianTimePast(), params);
 }
 
-unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, arith_uint256 bnAvg, int64_t nFirstBlockTime, const Consensus::Params& params)
+unsigned int DigishieldCalculateNextWorkRequired(const CBlockIndex* pindexLast, arith_uint256 bnAvg, int64_t nFirstBlockTime, const Consensus::Params& params)
 {
-    if (params.fPowNoRetargeting)
-        return pindexLast->nBits;
-
     // Use medians to prevent time-warp attacks
     int64_t nActualTimespan = pindexLast->GetMedianTimePast() - nFirstBlockTime;
     LogPrint(BCLog::POW, "  nActualTimespan = %d  before dampening\n", nActualTimespan);
-    nActualTimespan = params.AveragingWindowTimespan() + (nActualTimespan - params.AveragingWindowTimespan())/4;
+    nActualTimespan = params.DigishieldAveragingWindowTimespan() + (nActualTimespan - params.DigishieldAveragingWindowTimespan())/4;
     LogPrint(BCLog::POW, "  nActualTimespan = %d  before bounds\n", nActualTimespan);
 
-    if (nActualTimespan < params.MinActualTimespan())
-        nActualTimespan = params.MinActualTimespan();
-    if (nActualTimespan > params.MaxActualTimespan())
-        nActualTimespan = params.MaxActualTimespan();
+    // Limit adjustment step
+    if (nActualTimespan < params.DigishieldMinActualTimespan())
+        nActualTimespan = params.DigishieldMinActualTimespan();
+    if (nActualTimespan > params.DigishieldMaxActualTimespan())
+        nActualTimespan = params.DigishieldMaxActualTimespan();
 
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew {bnAvg};
-    bnNew /= params.AveragingWindowTimespan();
+    bnNew /= params.DigishieldAveragingWindowTimespan();
     bnNew *= nActualTimespan;
 
     if (bnNew > bnPowLimit)
@@ -110,11 +109,80 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, arith_uint
 
     // debug print
     LogPrint(BCLog::POW, "GetNextWorkRequired RETARGET\n");
-    LogPrint(BCLog::POW, "params.AveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.AveragingWindowTimespan(), nActualTimespan);
+    LogPrint(BCLog::POW, "params.DigishieldAveragingWindowTimespan() = %d    nActualTimespan = %d\n", params.DigishieldAveragingWindowTimespan(), nActualTimespan);
     LogPrint(BCLog::POW, "Current average: %08x  %s\n", bnAvg.GetCompact(), bnAvg.ToString());
     LogPrint(BCLog::POW, "After:  %08x  %s\n", bnNew.GetCompact(), bnNew.ToString());
 
     return bnNew.GetCompact();
+}
+
+unsigned int LwmaGetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+{
+    // Special difficulty rule for testnet:
+    // If the new block's timestamp is more than 2 * 10 minutes
+    // then allow mining of a min-difficulty block.
+    if (params.fPowAllowMinDifficultyBlocks &&
+        pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2) {
+        return UintToArith256(params.powLimit).GetCompact();
+    }
+    return LwmaCalculateNextWorkRequired(pindexLast, params);
+}
+
+unsigned int LwmaCalculateNextWorkRequired(const CBlockIndex* pindexLast, const Consensus::Params& params)
+{
+    const int64_t T = params.nPowTargetSpacing;
+
+    // For T=600, 300, 150 use approximately N=60, 90, 120
+    const int64_t N = params.nLwmaAveragingWindow;
+
+    // Define a k that will be used to get a proper average after weighting the solvetimes.
+    const int64_t k = N * (N + 1) * T / 2;
+
+    const int64_t height = pindexLast->nHeight;
+    const arith_uint256 powLimit = UintToArith256(params.powLimit);
+
+    // New coins just "give away" first N blocks. It's better to guess
+    // this value instead of using powLimit, but err on high side to not get stuck.
+    if (height < N) { return powLimit.GetCompact(); }
+
+    arith_uint256 avgTarget, nextTarget;
+    int64_t thisTimestamp, previousTimestamp;
+    int64_t sumWeightedSolvetimes = 0, j = 0;
+
+    const CBlockIndex* blockPreviousTimestamp = pindexLast->GetAncestor(height - N);
+    previousTimestamp = blockPreviousTimestamp->GetBlockTime();
+
+    // Loop through N most recent blocks.
+    for (int64_t i = height - N + 1; i <= height; i++) {
+        const CBlockIndex* block = pindexLast->GetAncestor(i);
+
+        // Prevent solvetimes from being negative in a safe way. It must be done like this.
+        // Do not attempt anything like  if (solvetime < 1) {solvetime=1;}
+        // The +1 ensures new coins do not calculate nextTarget = 0.
+        thisTimestamp = (block->GetBlockTime() > previousTimestamp) ? block->GetBlockTime() : previousTimestamp + 1;
+
+        // 6*T limit prevents large drops in diff from long solvetimes which would cause oscillations.
+        int64_t solvetime = std::min(6 * T, thisTimestamp - previousTimestamp);
+
+        // The following is part of "preventing negative solvetimes".
+        previousTimestamp = thisTimestamp;
+
+        // Give linearly higher weight to more recent solvetimes.
+        j++;
+        sumWeightedSolvetimes += solvetime * j;
+
+        arith_uint256 target;
+        target.SetCompact(block->nBits);
+        avgTarget += target / N / k; // Dividing by k here prevents an overflow below.
+    }
+
+    // Desired equation in next line was nextTarget = avgTarget * sumWeightSolvetimes / k
+    // but 1/k was moved to line above to prevent overflow in new coins
+    nextTarget = avgTarget * sumWeightedSolvetimes;
+
+    if (nextTarget > powLimit) { nextTarget = powLimit; }
+
+    return nextTarget.GetCompact();
 }
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params& params)
@@ -182,5 +250,6 @@ bool CheckEquihashSolution(const CBlockHeader *pblock)
 
     bool isValid;
     EhIsValidSolution(n, k, state, pblock->nSolution, isValid);
+
     return isValid;
 }
