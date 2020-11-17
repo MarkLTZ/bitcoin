@@ -113,8 +113,8 @@ public:
         pchMessageStart[3] = 0x93;
         nDefaultPort = 29333;
         nPruneAfterHeight = 100000;
-        m_assumed_blockchain_size = 320;
-        m_assumed_chain_state_size = 4;
+        m_assumed_blockchain_size = 5;
+        m_assumed_chain_state_size = 1;
 
         genesis = CreateGenesisBlock(
             1512832667,
@@ -231,8 +231,8 @@ public:
         pchMessageStart[3] = 0x5d;
         nDefaultPort = 39333;
         nPruneAfterHeight = 1000;
-        m_assumed_blockchain_size = 40;
-        m_assumed_chain_state_size = 2;
+        m_assumed_blockchain_size = 5;
+        m_assumed_chain_state_size = 1;
 
         genesis = CreateGenesisBlock(
             1511954736,
@@ -333,7 +333,7 @@ public:
         pchMessageStart[3] = 0xda;
         nDefaultPort = 48444;
         nPruneAfterHeight = 1000;
-        m_assumed_blockchain_size = 0;
+        m_assumed_blockchain_size = 2;
         m_assumed_chain_state_size = 0;
 
         UpdateActivationParametersFromArgs(args);
