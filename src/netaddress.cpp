@@ -48,7 +48,7 @@ void CNetAddr::SetRaw(Network network, const uint8_t *ip_in)
 
 /**
  * Try to make this a dummy address that maps the specified name into IPv6 like
- * so: (0xFD + %sha256("bitcoin")[0:5]) + %sha256(name)[0:10]. Such dummy
+ * so: (0xFD + %sha256("litecoinz")[0:5]) + %sha256(name)[0:10]. Such dummy
  * addresses have a prefix of fd6b:88c0:8724::/48 and are guaranteed to not be
  * publicly routable as it falls under RFC4193's fc00::/7 subnet allocated to
  * unique-local addresses.
