@@ -579,6 +579,31 @@ fs::path GetDefaultDataDir()
 #endif
 }
 
+fs::path GetDefaultParamsDir()
+{
+    // Windows: C:\Users\Username\AppData\Roaming\LitecoinzParams
+    // macOS: ~/Library/Application Support/LitecoinzParams
+    // Unix-like: ~/.litecoinz-params
+#ifdef WIN32
+    // Windows
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "LitecoinzParams";
+#else
+    fs::path pathRet;
+    char* pszHome = getenv("HOME");
+    if (pszHome == nullptr || strlen(pszHome) == 0)
+        pathRet = fs::path("/");
+    else
+        pathRet = fs::path(pszHome);
+#ifdef MAC_OSX
+    // macOS
+    return pathRet / "Library/Application Support/LitecoinzParams";
+#else
+    // Unix-like
+    return pathRet / ".litecoinz-params";
+#endif
+#endif
+}
+
 namespace {
 fs::path StripRedundantLastElementsOfPath(const fs::path& path)
 {
@@ -594,6 +619,7 @@ fs::path StripRedundantLastElementsOfPath(const fs::path& path)
 
 static fs::path g_blocks_path_cache_net_specific;
 static fs::path pathCached;
+static fs::path paramsPathCached;
 static fs::path pathCachedNetSpecific;
 static RecursiveMutex csPathCached;
 
@@ -654,10 +680,42 @@ const fs::path &GetDataDir(bool fNetSpecific)
     return path;
 }
 
+const fs::path &GetParamsDir()
+{
+    LOCK(csPathCached);
+    fs::path &path = paramsPathCached;
+
+    // Cache the path to avoid calling fs::create_directories on every call of
+    // this function
+    if (!path.empty()) return path;
+
+    std::string paramsdir = gArgs.GetArg("-paramsdir", "");
+    if (!paramsdir.empty()) {
+        path = fs::system_complete(paramsdir);
+        if (!fs::is_directory(path)) {
+            path = "";
+            return path;
+        }
+    } else {
+        path = GetDefaultParamsDir();
+    }
+
+    fs::create_directories(path);
+
+    path = StripRedundantLastElementsOfPath(path);
+    return path;
+}
+
 bool CheckDataDirOption()
 {
     std::string datadir = gArgs.GetArg("-datadir", "");
     return datadir.empty() || fs::is_directory(fs::system_complete(datadir));
+}
+
+bool CheckParamsDirOption()
+{
+    std::string paramsdir = gArgs.GetArg("-paramsdir", "");
+    return paramsdir.empty() || fs::is_directory(fs::system_complete(paramsdir));
 }
 
 void ClearDatadirCache()
@@ -667,6 +725,13 @@ void ClearDatadirCache()
     pathCached = fs::path();
     pathCachedNetSpecific = fs::path();
     g_blocks_path_cache_net_specific = fs::path();
+}
+
+void ClearParamsdirCache()
+{
+    LOCK(csPathCached);
+
+    paramsPathCached = fs::path();
 }
 
 fs::path GetConfigFile(const std::string& confPath)
@@ -832,6 +897,14 @@ bool ArgsManager::ReadConfigFiles(std::string& error, bool ignore_invalid_keys)
         error = strprintf("specified data directory \"%s\" does not exist.", gArgs.GetArg("-datadir", ""));
         return false;
     }
+
+    // If paramsdir is changed in .conf file:
+    ClearParamsdirCache();
+    if (!CheckParamsDirOption()) {
+        error = strprintf("specified circuit parameters directory \"%s\" does not exist.", gArgs.GetArg("-paramsdir", ""));
+        return false;
+    }
+
     return true;
 }
 

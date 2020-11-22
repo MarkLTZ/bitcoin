@@ -400,6 +400,7 @@ void SetupServerArgs()
     gArgs.AddArg("-maxorphantx=<n>", strprintf("Keep at most <n> unconnectable transactions in memory (default: %u)", DEFAULT_MAX_ORPHAN_TRANSACTIONS), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-mempoolexpiry=<n>", strprintf("Do not keep transactions in the mempool longer than <n> hours (default: %u)", DEFAULT_MEMPOOL_EXPIRY), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-minimumchainwork=<hex>", strprintf("Minimum work assumed to exist on a valid chain in hex (default: %s, testnet: %s)", defaultChainParams->GetConsensus().nMinimumChainWork.GetHex(), testnetChainParams->GetConsensus().nMinimumChainWork.GetHex()), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-paramsdir=<dir>", "Specify LitecoinZ circuit parameters directory", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-par=<n>", strprintf("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)",
         -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     gArgs.AddArg("-persistmempool", strprintf("Whether to save the mempool on shutdown and load on restart (default: %u)", DEFAULT_PERSIST_MEMPOOL), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
@@ -1264,6 +1265,14 @@ bool AppInitMain(NodeContext& node)
                   "from a different location, it will be unable to locate the current data files. There could "
                   "also be data loss if litecoinz is started while in a temporary directory.\n",
             gArgs.GetArg("-datadir", ""), fs::current_path().string());
+    }
+
+    // Warn about relative -paramsdir path.
+    if (gArgs.IsArgSet("-paramsdir") && !fs::path(gArgs.GetArg("-paramsdir", "")).is_absolute()) {
+        LogPrintf("Warning: relative paramsdir option '%s' specified, which will be interpreted relative to the " /* Continued */
+                  "current working directory '%s'. This is fragile, because if litecoinz is started in the future "
+                  "from a different location, it will be unable to locate the current circuit parameters files.\n",
+            gArgs.GetArg("-paramsdir", ""), fs::current_path().string());
     }
 
     InitSignatureCache();

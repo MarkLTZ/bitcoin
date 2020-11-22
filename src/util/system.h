@@ -70,13 +70,18 @@ void ReleaseDirectoryLocks();
 
 bool TryCreateDirectories(const fs::path& p);
 fs::path GetDefaultDataDir();
+fs::path GetDefaultParamsDir();
 // The blocks directory is always net specific.
 const fs::path &GetBlocksDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
+const fs::path &GetParamsDir();
 // Return true if -datadir option points to a valid directory or is not specified.
 bool CheckDataDirOption();
+// Return true if -paramsdir option points to a valid directory or is not specified.
+bool CheckParamsDirOption();
 /** Tests only */
 void ClearDatadirCache();
+void ClearParamsdirCache();
 fs::path GetConfigFile(const std::string& confPath);
 #ifdef WIN32
 fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
