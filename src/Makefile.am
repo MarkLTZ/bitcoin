@@ -129,6 +129,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  fetchparams.h \
   flatfile.h \
   fs.h \
   httprpc.h \
@@ -502,6 +503,7 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  fetchparams.cpp \
   fs.cpp \
   interfaces/handler.cpp \
   logging.cpp \
@@ -570,7 +572,7 @@ litecoinzd_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS)
+litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
 
 # litecoinz-cli binary #
 litecoinz_cli_SOURCES = bitcoin-cli.cpp
@@ -588,7 +590,7 @@ litecoinz_cli_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS)
+litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
 #
 
 # litecoinz-tx binary #
@@ -609,7 +611,7 @@ litecoinz_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS)
+litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
 #
 
 # litecoinz-wallet binary #
@@ -636,7 +638,7 @@ litecoinz_wallet_LDADD = \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)
 
-litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS)
+litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
 #
 
 # bitcoinconsensus library #

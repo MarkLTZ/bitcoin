@@ -18,6 +18,7 @@
 #include <compat/sanity.h>
 #include <consensus/validation.h>
 #include <fs.h>
+#include <fetchparams.h>
 #include <httprpc.h>
 #include <httpserver.h>
 #include <index/blockfilterindex.h>
@@ -54,7 +55,6 @@
 #include <util/translation.h>
 #include <validation.h>
 #include <hash.h>
-
 
 #include <validationinterface.h>
 #include <walletinitinterface.h>
@@ -765,6 +765,48 @@ static bool InitSanityCheck()
     return true;
 }
 
+static bool LoadParams()
+{
+    boost::filesystem::path sapling_spend = GetParamsDir() / "sapling-spend.params";
+    boost::filesystem::path sapling_output = GetParamsDir() / "sapling-output.params";
+    boost::filesystem::path sprout_groth16 = GetParamsDir() / "sprout-groth16.params";
+
+    if(!(boost::filesystem::exists(sapling_spend))) {
+        // Download the 'sapling-spend.params' file
+        if (!FetchParams("https://z.cash/downloads/sapling-spend.params", sapling_spend.string()))
+            return false;
+    }
+
+    // Verify the 'sapling-spend.params' file
+    if (!(VerifyParams(sapling_spend.string(), "8e48ffd23abb3a5fd9c5589204f32d9c31285a04b78096ba40a79b75677efc13"))) {
+        return false;
+    }
+
+    if(!(boost::filesystem::exists(sapling_output))) {
+        // Download the 'sapling-output.params' file
+        if (!FetchParams("https://z.cash/downloads/sapling-output.params", sapling_output.string()))
+            return false;
+    }
+
+    // Verify the 'sapling-output.params' file
+    if (!(VerifyParams(sapling_output.string(), "2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4"))) {
+        return false;
+    }
+
+    if(!(boost::filesystem::exists(sprout_groth16))) {
+        // Download the 'sprout-groth16.params' file
+        if (!FetchParams("https://z.cash/downloads/sprout-groth16.params", sprout_groth16.string()))
+            return false;
+    }
+
+    // Verify the 'sprout-groth16.params' file
+    if (!(VerifyParams(sprout_groth16.string(), "b685d700c60328498fbde589c8c7c484c722b788b265b72af448a5bf0ee55b50"))) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool AppInitServers()
 {
     RPCServer::OnStarted(&OnRPCStarted);
@@ -1330,6 +1372,10 @@ bool AppInitMain(NodeContext& node)
 #if ENABLE_ZMQ
     RegisterZMQRPCCommands(tableRPC);
 #endif
+
+    // Initialize LitecoinZ circuit parameters
+    if (!(LoadParams()))
+        return InitError(_("Error downloading or verifying LitecoinZ circuit parameters.").translated);
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections

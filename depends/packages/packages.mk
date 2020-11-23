@@ -1,4 +1,4 @@
-packages:=boost libevent libsodium
+packages:=boost libevent curl libsodium
 
 qt_packages = zlib
 
