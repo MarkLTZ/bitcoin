@@ -9,6 +9,7 @@
 #include <compat/endian.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <ios>
 #include <limits>
@@ -711,6 +712,12 @@ template<typename Stream, typename T, typename A, typename V> void Unserialize_i
 template<typename Stream, typename T, typename A> inline void Unserialize(Stream& is, std::vector<T, A>& v);
 
 /**
+ * array
+ */
+template<typename Stream, typename T, std::size_t N> void Serialize(Stream& os, const std::array<T, N>& item);
+template<typename Stream, typename T, std::size_t N> void Unserialize(Stream& is, std::array<T, N>& item);
+
+/**
  * pair
  */
 template<typename Stream, typename K, typename T> void Serialize(Stream& os, const std::pair<K, T>& item);
@@ -913,6 +920,27 @@ template<typename Stream, typename T, typename A>
 inline void Unserialize(Stream& is, std::vector<T, A>& v)
 {
     Unserialize_impl(is, v, T());
+}
+
+
+
+/**
+ * array
+ */
+template<typename Stream, typename T, std::size_t N>
+void Serialize(Stream& os, const std::array<T, N>& item)
+{
+    for (size_t i = 0; i < N; i++) {
+        Serialize(os, item[i]);
+    }
+}
+
+template<typename Stream, typename T, std::size_t N>
+void Unserialize(Stream& is, std::array<T, N>& item)
+{
+    for (size_t i = 0; i < N; i++) {
+        Unserialize(is, item[i]);
+    }
 }
 
 

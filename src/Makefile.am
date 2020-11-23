@@ -34,6 +34,7 @@ LIBBITCOIN_CRYPTO_BASE=crypto/libbitcoin_crypto_base.a
 LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
 LIBRUSTZCASH=rustzcash/target/$(CARGO_TARGET)/release/librustzcash.a
+LIBZCASH=zcash/libzcash.a
 
 if ENABLE_ZMQ
 LIBBITCOIN_ZMQ=libbitcoin_zmq.a
@@ -91,7 +92,8 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_WALLET_TOOL) \
-  $(LIBBITCOIN_ZMQ)
+  $(LIBBITCOIN_ZMQ) \
+  $(LIBZCASH)
 
 lib_LTLIBRARIES = $(LIBBITCOINCONSENSUS)
 
@@ -117,6 +119,21 @@ endif
 endif
 
 .PHONY: FORCE cargo-build check-symbols check-security
+# zcash #
+LIBZCASH_H = \
+  zcash/IncrementalMerkleTree.hpp \
+  zcash/NoteEncryption.hpp \
+  zcash/Address.hpp \
+  zcash/address/sapling.hpp \
+  zcash/address/sprout.hpp \
+  zcash/address/zip32.h \
+  zcash/JoinSplit.hpp \
+  zcash/Note.hpp \
+  zcash/prf.h \
+  zcash/Proof.hpp \
+  zcash/util.h \
+  zcash/Zcash.h
+
 # litecoinz core #
 BITCOIN_CORE_H = \
   addrdb.h \
@@ -228,6 +245,7 @@ BITCOIN_CORE_H = \
   txdb.h \
   txmempool.h \
   ui_interface.h \
+  uint252.h \
   undo.h \
   util/asmap.h \
   util/bip32.h \
@@ -336,7 +354,8 @@ libbitcoin_server_a_SOURCES = \
   validation.cpp \
   validationinterface.cpp \
   versionbits.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 if ENABLE_WALLET
 libbitcoin_server_a_SOURCES += wallet/init.cpp
@@ -375,13 +394,15 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/walletdb.cpp \
   wallet/walletutil.cpp \
   wallet/coinselection.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 libbitcoin_wallet_tool_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_tool_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_tool_a_SOURCES = \
   wallet/wallettool.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 # crypto primitives library
 crypto_libbitcoin_crypto_base_a_CPPFLAGS = $(AM_CPPFLAGS)
@@ -507,7 +528,8 @@ libbitcoin_common_a_SOURCES = \
   script/standard.cpp \
   versionbitsinfo.cpp \
   warnings.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 # util: shared between all executables.
 # This library *must* be included to make sure that the glibc
@@ -548,7 +570,8 @@ libbitcoin_util_a_SOURCES = \
   util/string.cpp \
   util/time.cpp \
   util/url.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
@@ -562,7 +585,8 @@ libbitcoin_cli_a_SOURCES = \
   compat/stdin.h \
   compat/stdin.cpp \
   rpc/client.cpp \
-  $(BITCOIN_CORE_H)
+  $(BITCOIN_CORE_H) \
+  $(LIBZCASH_H)
 
 nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
@@ -591,7 +615,7 @@ litecoinzd_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
+litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS) $(LIBZCASH)
 
 # litecoinz-cli binary #
 litecoinz_cli_SOURCES = bitcoin-cli.cpp
@@ -609,7 +633,7 @@ litecoinz_cli_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
+litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS) $(LIBZCASH)
 #
 
 # litecoinz-tx binary #
@@ -630,7 +654,7 @@ litecoinz_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
+litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS) $(LIBZCASH)
 #
 
 # litecoinz-wallet binary #
@@ -657,7 +681,24 @@ litecoinz_wallet_LDADD = \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)
 
-litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
+litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS) $(LIBZCASH)
+#
+
+# litecoinz protocol primitives #
+zcash_libzcash_a_SOURCES = \
+  zcash/IncrementalMerkleTree.cpp \
+  zcash/NoteEncryption.cpp \
+  zcash/Address.cpp \
+  zcash/address/sapling.cpp \
+  zcash/address/sprout.cpp \
+  zcash/address/zip32.cpp \
+  zcash/JoinSplit.cpp \
+  zcash/Note.cpp \
+  zcash/prf.cpp \
+  zcash/util.cpp
+
+zcash_libzcash_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+zcash_libzcash_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 #
 
 # bitcoinconsensus library #
