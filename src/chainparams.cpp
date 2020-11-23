@@ -214,7 +214,7 @@ public:
         consensus.nLwmaAveragingWindow = 60;
         consensus.nPowTargetSpacing = 10 * 60;
 
-        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
         consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
