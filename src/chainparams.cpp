@@ -82,7 +82,7 @@ public:
 
         // POW DDA LWMA Parameters
         consensus.nLwmaForkHeight = 600000;
-        consensus.nLwmaAveragingWindow = 45;
+        consensus.nLwmaAveragingWindow = 60;
         consensus.nPowTargetSpacing = 10 * 60;
 
         consensus.fPowAllowMinDifficultyBlocks = false;
@@ -211,7 +211,7 @@ public:
 
         // POW DDA LWMA Parameters
         consensus.nLwmaForkHeight = 6500;
-        consensus.nLwmaAveragingWindow = 45;
+        consensus.nLwmaAveragingWindow = 60;
         consensus.nPowTargetSpacing = 10 * 60;
 
         consensus.fPowAllowMinDifficultyBlocks = true;
@@ -320,7 +320,7 @@ public:
 
         // POW DDA LWMA Parameters
         consensus.nLwmaForkHeight = -1; // Activated on regtest
-        consensus.nLwmaAveragingWindow = 45;
+        consensus.nLwmaAveragingWindow = 60;
         consensus.nPowTargetSpacing = 10 * 60;
 
         consensus.fPowAllowMinDifficultyBlocks = true;
