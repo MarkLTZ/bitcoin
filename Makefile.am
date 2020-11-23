@@ -190,6 +190,7 @@ LCOV_FILTER_PATTERN = \
 	-p "src/univalue" \
 	-p "src/crypto/ctaes" \
 	-p "src/secp256k1" \
+	-p "src/rustzcash" \
 	-p "depends"
 
 baseline.info:
@@ -316,6 +317,8 @@ EXTRA_DIST += \
     test/util/data/txcreatesignv1.json \
     test/util/data/txcreatesignv2.hex \
     test/util/rpcauth-test.py
+
+EXTRA_DIST += src/rustzcash
 
 CLEANFILES = $(OSX_DMG) $(BITCOIN_WIN_INSTALLER)
 

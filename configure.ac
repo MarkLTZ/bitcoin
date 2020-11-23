@@ -501,6 +501,37 @@ AC_ARG_WITH([daemon],
   [build_bitcoind=$withval],
   [build_bitcoind=yes])
 
+AC_PATH_PROG(CARGO,cargo,none)
+if test x$CARGO = xnone; then
+  AC_MSG_ERROR("cargo required to enable rust support.")
+fi
+
+AC_PATH_PROG(RUSTC,rustc,none)
+if test x$RUSTC = xnone; then
+  AC_MSG_ERROR("rustc required to enable rust support.")
+fi
+
+dnl Find the additional lib (if any) responsible for handling
+dnl dlopen/dlsym/etc.
+TEMP_LIBS="$LIBS"
+LIBS=
+AC_SEARCH_LIBS([dlsym],[dl])
+DL_LIBS="$LIBS"
+LIBS="$TEMP_LIBS"
+
+CARGO_FLAGS="$CARGO_FLAGS --lib --verbose --release --locked"
+case $host in
+  ${host_cpu}-w64-mingw*) CARGO_TARGET=${host_cpu}-pc-windows-gnu ;;
+  ${host_cpu}-pc-linux*) CARGO_TARGET=${host_cpu}-unknown-${host_os} ;;
+  ${host_cpu}-apple-darwin*) CARGO_TARGET=${host_cpu}-apple-darwin ;;
+  *) CARGO_TARGET=${host} ;;
+esac
+
+if test x$RUST_VENDORED_SOURCES != x; then
+  AC_CONFIG_FILES([.cargo/config:.cargo/config.in])
+  CARGO_FLAGS="$CARGO_FLAGS --offline"
+fi
+
 use_pkgconfig=yes
 case $host in
   *mingw*)
@@ -1600,6 +1631,10 @@ AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
 AC_SUBST(CURL_LIBS)
 AC_SUBST(SODIUM_LIBS)
+AC_SUBST(DL_LIBS)
+AC_SUBST(CARGO_FLAGS)
+AC_SUBST(CARGO_TARGET)
+AC_SUBST(RUST_VENDORED_SOURCES)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)

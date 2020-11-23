@@ -1,4 +1,4 @@
-packages:=boost libevent curl libsodium
+packages:=boost libevent curl libsodium rust vendored-sources
 
 qt_packages = zlib
 

@@ -25,6 +25,8 @@ DOWNLOAD_RETRIES:=3
 HOST_ID_SALT ?= salt
 BUILD_ID_SALT ?= salt
 
+CRATE_REGISTRY:=vendored-sources
+
 host:=$(BUILD)
 ifneq ($(HOST),)
 host:=$(HOST)
@@ -153,6 +155,7 @@ $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_
             -e 's|@no_qt@|$(NO_QT)|' \
             -e 's|@no_qr@|$(NO_QR)|' \
             -e 's|@no_zmq@|$(NO_ZMQ)|' \
+            -e 's|@rust_target@|$(call rust_target,rust,$(canonical_host),$(host_os))|' \
             -e 's|@no_wallet@|$(NO_WALLET)|' \
             -e 's|@no_upnp@|$(NO_UPNP)|' \
             -e 's|@debug@|$(DEBUG)|' \
@@ -198,10 +201,12 @@ download-osx:
 	@$(MAKE) -s HOST=x86_64-apple-darwin14 download-one
 download-linux:
 	@$(MAKE) -s HOST=x86_64-unknown-linux-gnu download-one
+download-aarch64:
+	@$(MAKE) -s HOST=aarch64-unknown-linux-gnu download-one
 download-win:
 	@$(MAKE) -s HOST=x86_64-w64-mingw32 download-one
-download: download-osx download-linux download-win
+download: download-osx download-linux download-aarch64 download-win
 
 $(foreach package,$(all_packages),$(eval $(call ext_add_stages,$(package))))
 
-.PHONY: install cached clean clean-all download-one download-osx download-linux download-win download check-packages check-sources
+.PHONY: install cached clean clean-all download-one download-osx download-linux download-aarch64 download-win download check-packages check-sources

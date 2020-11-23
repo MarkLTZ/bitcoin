@@ -22,6 +22,7 @@ endif
 BITCOIN_INCLUDES=-I$(builddir) $(BDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(LEVELDB_CPPFLAGS)
 
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
+BITCOIN_INCLUDES += -I$(srcdir)/rustzcash/include
 BITCOIN_INCLUDES += $(UNIVALUE_CFLAGS)
 
 LIBBITCOIN_SERVER=libbitcoin_server.a
@@ -32,6 +33,7 @@ LIBBITCOIN_UTIL=libbitcoin_util.a
 LIBBITCOIN_CRYPTO_BASE=crypto/libbitcoin_crypto_base.a
 LIBBITCOINQT=qt/libbitcoinqt.a
 LIBSECP256K1=secp256k1/libsecp256k1.la
+LIBRUSTZCASH=rustzcash/target/$(CARGO_TARGET)/release/librustzcash.a
 
 if ENABLE_ZMQ
 LIBBITCOIN_ZMQ=libbitcoin_zmq.a
@@ -60,6 +62,23 @@ endif
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*.h) $(wildcard secp256k1/src/*.c) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
+
+cargo-build: $(wildcard rustzcash/include/*.h)
+	RUSTC="$(RUSTC)" $(CARGO) build $(CARGO_FLAGS) --manifest-path=$(top_srcdir)/src/rustzcash/Cargo.toml --target=$(CARGO_TARGET)
+
+if TARGET_WINDOWS
+LIBRUSTZCASH_WIN=rustzcash/target/$(CARGO_TARGET)/release/rustzcash.lib
+
+$(LIBRUSTZCASH_WIN): cargo-build
+
+# This ensures that the Rust library is correctly linked in by libtool.
+# See https://github.com/rust-lang/rust/issues/69904 for the underlying cause.
+$(LIBRUSTZCASH): $(LIBRUSTZCASH_WIN)
+	$(AM_V_at)cp $< $@
+
+else
+$(LIBRUSTZCASH): cargo-build
+endif
 
 # Make is not made aware of per-object dependencies to avoid limiting building parallelization
 # But to build the less dependent modules first, we manually select their order here:
@@ -97,7 +116,7 @@ if BUILD_BITCOIN_WALLET
 endif
 endif
 
-.PHONY: FORCE check-symbols check-security
+.PHONY: FORCE cargo-build check-symbols check-security
 # litecoinz core #
 BITCOIN_CORE_H = \
   addrdb.h \
@@ -572,7 +591,7 @@ litecoinzd_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
+litecoinzd_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
 
 # litecoinz-cli binary #
 litecoinz_cli_SOURCES = bitcoin-cli.cpp
@@ -590,7 +609,7 @@ litecoinz_cli_LDADD = \
   $(LIBBITCOIN_UTIL) \
   $(LIBBITCOIN_CRYPTO)
 
-litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
+litecoinz_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
 #
 
 # litecoinz-tx binary #
@@ -611,7 +630,7 @@ litecoinz_tx_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
+litecoinz_tx_LDADD += $(BOOST_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
 #
 
 # litecoinz-wallet binary #
@@ -638,7 +657,7 @@ litecoinz_wallet_LDADD = \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE)
 
-litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS)
+litecoinz_wallet_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(MINIUPNPC_LIBS) $(ZMQ_LIBS) $(SODIUM_LIBS) $(CURL_LIBS) $(LIBRUSTZCASH) $(DL_LIBS)
 #
 
 # bitcoinconsensus library #
@@ -693,6 +712,7 @@ $(top_srcdir)/$(subdir)/config/bitcoin-config.h.in:  $(am__configure_deps)
 clean-local:
 	-$(MAKE) -C secp256k1 clean
 	-$(MAKE) -C univalue clean
+	-rm -rf rustzcash/target/
 	-rm -f leveldb/*/*.gcda leveldb/*/*.gcno leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno
 	-rm -f config.h
 	-rm -rf test/__pycache__
