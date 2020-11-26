@@ -418,6 +418,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
                             }},
                         {RPCResult::Type::NUM, "vbrequired", "bit mask of versionbits the server requires set in submissions"},
                         {RPCResult::Type::STR, "previousblockhash", "The hash of current highest block"},
+                        {RPCResult::Type::STR, "finalsaplingroothash", "The hash of final sapling root"},
                         {RPCResult::Type::ARR, "", "contents of non-coinbase transactions that should be included in the next block",
                             {
                                 {RPCResult::Type::OBJ, "", "",
@@ -741,6 +742,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     }
 
     result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+    result.pushKV("finalsaplingroothash", pblock->hashSaplingRoot.GetHex());
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);

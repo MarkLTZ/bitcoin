@@ -82,6 +82,54 @@ public:
     }
 };
 
+class Note
+{
+public:
+    //! unspent transaction output
+    OutputDescription out;
+
+    //! at which height this containing transaction was included in the active block chain
+    uint32_t nHeight : 31;
+
+    //! construct a Note from a OutputDescription information.
+    Note(OutputDescription&& outIn, int nHeightIn) : out(std::move(outIn)), nHeight(nHeightIn) {}
+    Note(const OutputDescription& outIn, int nHeightIn) : out(outIn), nHeight(nHeightIn) {}
+
+    void Clear() {
+        out.SetNull();
+        nHeight = 0;
+    }
+
+    //! empty constructor
+    Note() : nHeight(0) { }
+
+    template<typename Stream>
+    void Serialize(Stream &s) const {
+        assert(!IsNoteSpent());
+        uint32_t code = nHeight * uint32_t{2};
+        ::Serialize(s, VARINT(code));
+        ::Serialize(s, out);
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream &s) {
+        uint32_t code = 0;
+        ::Unserialize(s, VARINT(code));
+        nHeight = code >> 1;
+        ::Unserialize(s, out);
+    }
+
+    bool IsNoteSpent() const {
+        return out.IsNull();
+    }
+
+    size_t DynamicMemoryUsage() const {
+        return memusage::DynamicUsage(out.cv) +
+               memusage::DynamicUsage(out.cm) +
+               memusage::DynamicUsage(out.ephemeralKey);
+    }
+};
+
 class SaltedOutpointHasher
 {
 private:
@@ -109,6 +157,33 @@ public:
     }
 };
 
+class SaltedNullifierHasher
+{
+private:
+    /** Salt */
+    const uint64_t k0, k1;
+
+public:
+    SaltedNullifierHasher();
+
+    /**
+     * This *must* return size_t. With Boost 1.46 on 32-bit systems the
+     * unordered_map will behave unpredictably if the custom hasher returns a
+     * uint64_t, resulting in failures when syncing the chain (#4634).
+     *
+     * Having the hash noexcept allows libstdc++'s unordered_map to recalculate
+     * the hash during rehash, so it does not have to cache the value. This
+     * reduces node's memory by sizeof(size_t). The required recalculation has
+     * a slight performance penalty (around 1.6%), but this is compensated by
+     * memory savings of about 9% which allow for a larger dbcache setting.
+     *
+     * @see https://gcc.gnu.org/onlinedocs/gcc-9.2.0/libstdc++/manual/manual/unordered_associative.html
+     */
+    size_t operator()(const uint256& id) const noexcept {
+        return SipHashUint256Extra(k0, k1, id, 0);
+    }
+};
+
 struct CCoinsCacheEntry
 {
     Coin coin; // The actual cached data.
@@ -128,7 +203,27 @@ struct CCoinsCacheEntry
     explicit CCoinsCacheEntry(Coin&& coin_) : coin(std::move(coin_)), flags(0) {}
 };
 
+struct CNotesCacheEntry
+{
+    Note note; // The actual cached data.
+    unsigned char flags;
+
+    enum Flags {
+        DIRTY = (1 << 0), // This cache entry is potentially different from the version in the parent view.
+        FRESH = (1 << 1), // The parent view does not have this entry (or it is pruned).
+        /* Note that FRESH is a performance optimization with which we can
+         * erase notes that are fully spent if we know we do not need to
+         * flush the changes to the parent cache.  It is always safe to
+         * not mark FRESH if that condition is not guaranteed.
+         */
+    };
+
+    CNotesCacheEntry() : flags(0) {}
+    explicit CNotesCacheEntry(Note&& note_) : note(std::move(note_)), flags(0) {}
+};
+
 typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher> CCoinsMap;
+typedef std::unordered_map<uint256, CNotesCacheEntry, SaltedNullifierHasher> CNotesMap;
 
 /** Cursor for iterating over CoinsView state */
 class CCoinsViewCursor
@@ -160,8 +255,17 @@ public:
      */
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
 
+    /** Retrieve the Note (unspent transaction output) for a given nullifier.
+     *  Returns true only when an unspent note was found, which is returned in note.
+     *  When false is returned, note's value is unspecified.
+     */
+    virtual bool GetNote(const uint256 &nullifier, Note &note) const;
+
     //! Just check whether a given outpoint is unspent.
     virtual bool HaveCoin(const COutPoint &outpoint) const;
+
+    //! Just check whether a given note outpoint is unspent.
+    virtual bool HaveNote(const uint256 &nullifier) const;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
     virtual uint256 GetBestBlock() const;
@@ -196,7 +300,9 @@ protected:
 public:
     CCoinsViewBacked(CCoinsView *viewIn);
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool GetNote(const uint256 &nullifier, Note &note) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
+    bool HaveNote(const uint256 &nullifier) const override;
     uint256 GetBestBlock() const override;
     std::vector<uint256> GetHeadBlocks() const override;
     void SetBackend(CCoinsView &viewIn);
@@ -216,9 +322,11 @@ protected:
      */
     mutable uint256 hashBlock;
     mutable CCoinsMap cacheCoins;
+    mutable CNotesMap cacheNotes;
 
     /* Cached dynamic memory usage for the inner Coin objects. */
     mutable size_t cachedCoinsUsage;
+    mutable size_t cachedNotesUsage;
 
 public:
     CCoinsViewCache(CCoinsView *baseIn);
@@ -230,7 +338,9 @@ public:
 
     // Standard CCoinsView methods
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool GetNote(const uint256 &nullifier, Note &note) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
+    bool HaveNote(const uint256 &nullifier) const override;
     uint256 GetBestBlock() const override;
     void SetBestBlock(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
@@ -246,6 +356,13 @@ public:
     bool HaveCoinInCache(const COutPoint &outpoint) const;
 
     /**
+     * Check if we have the given utxo already loaded in this cache.
+     * The semantics are the same as HaveNote(), but no calls to
+     * the backing CCoinsView are made.
+     */
+    bool HaveNoteInCache(const uint256 &nullifier) const;
+
+    /**
      * Return a reference to Coin in the cache, or a pruned one if not found. This is
      * more efficient than GetCoin.
      *
@@ -258,10 +375,28 @@ public:
     const Coin& AccessCoin(const COutPoint &output) const;
 
     /**
+     * Return a reference to Note in the cache, or a pruned one if not found. This is
+     * more efficient than GetNote.
+     *
+     * Generally, do not hold the reference returned for more than a short scope.
+     * While the current implementation allows for modifications to the contents
+     * of the cache while holding the reference, this behavior should not be relied
+     * on! To be safe, best to not hold the returned reference through any other
+     * calls to this cache.
+     */
+    const Note& AccessNote(const uint256 &nullifier) const;
+
+    /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
      * already exist.
      */
     void AddCoin(const COutPoint& outpoint, Coin&& coin, bool potential_overwrite);
+
+    /**
+     * Add a note. Set potential_overwrite to true if a non-pruned version may
+     * already exist.
+     */
+    void AddNote(const uint256 &nullifier, Note&& note, bool potential_overwrite);
 
     /**
      * Spend a coin. Pass moveto in order to get the deleted data.
@@ -269,6 +404,13 @@ public:
      * has no effect.
      */
     bool SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr);
+
+    /**
+     * Spend a note. Pass moveto in order to get the deleted data.
+     * If no unspent output exists for the passed nullifier, this call
+     * has no effect.
+     */
+    bool SpendNote(const uint256 &nullifier, Note* moveto = nullptr);
 
     /**
      * Push the modifications applied to this cache to its base.
@@ -281,10 +423,19 @@ public:
      * Removes the UTXO with the given outpoint from the cache, if it is
      * not modified.
      */
-    void Uncache(const COutPoint &outpoint);
+    void UncacheCoin(const COutPoint &outpoint);
+
+   /**
+     * Removes the UTXO with the given nullifier from the cache, if it is
+     * not modified.
+     */
+    void UncacheNote(const uint256 &nullifier);
 
     //! Calculate the size of the cache (in number of transaction outputs)
     unsigned int GetCacheSize() const;
+
+    //! Calculate the size of the note's cache (in number of transaction nullifiers)
+    unsigned int GetNotesCacheSize() const;
 
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const;
@@ -308,6 +459,11 @@ private:
      * memory usage.
      */
     CCoinsMap::iterator FetchCoin(const COutPoint &outpoint) const;
+    /**
+     * @note this is marked const, but may actually append to `cacheNotes`, increasing
+     * memory usage.
+     */
+    CNotesMap::iterator FetchNote(const uint256 &nullifier) const;
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.
@@ -318,11 +474,25 @@ private:
 // (pre-BIP34) cases.
 void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, bool check = false);
 
+//! Utility function to add all of a transaction's nullifiers to a cache.
+//! When check is false, this assumes that overwrites are only possible for coinbase transactions.
+//! When check is true, the underlying view may be queried to determine whether an addition is
+//! an overwrite.
+// TODO: pass in a boolean to limit these possible overwrites to known
+// (pre-BIP34) cases.
+void AddNotes(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, bool check = false);
+
 //! Utility function to find any unspent output with a given txid.
 //! This function can be quite expensive because in the event of a transaction
 //! which is not found in the cache, it can cause up to MAX_OUTPUTS_PER_BLOCK
 //! lookups to database, so it should be used with care.
 const Coin& AccessByTxid(const CCoinsViewCache& cache, const uint256& txid);
+
+//! Utility function to find any unspent note with a given nullifier.
+//! This function can be quite expensive because in the event of a nullifier
+//! which is not found in the cache, it can cause lookup to database, so it
+//! should be used with care.
+const Note& AccessByNullifier(const CCoinsViewCache& cache, const uint256& nullifier);
 
 /**
  * This is a minimally invasive approach to shutdown on LevelDB read errors from the
@@ -341,6 +511,7 @@ public:
     }
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool GetNote(const uint256 &nullifier, Note &note) const override;
 
 private:
     /** A list of callbacks to execute upon leveldb read error. */

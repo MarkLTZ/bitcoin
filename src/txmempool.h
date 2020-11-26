@@ -806,6 +806,7 @@ protected:
 public:
     CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempoolIn);
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool GetNote(const uint256 &nullifier, Note &note) const override;
 };
 
 /**

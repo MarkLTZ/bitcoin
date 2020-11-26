@@ -64,8 +64,9 @@ class CBlockUndo
 {
 public:
     std::vector<CTxUndo> vtxundo; // for all but the coinbase
+    uint256 old_sprout_tree_root;
 
-    SERIALIZE_METHODS(CBlockUndo, obj) { READWRITE(obj.vtxundo); }
+    SERIALIZE_METHODS(CBlockUndo, obj) { READWRITE(obj.vtxundo); READWRITE(obj.old_sprout_tree_root); }
 };
 
 #endif // BITCOIN_UNDO_H

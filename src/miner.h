@@ -149,6 +149,7 @@ private:
     const CChainParams& chainparams;
     const CTxMemPool& m_mempool;
 
+    SaplingMerkleTree sapling_tree;
 public:
     struct Options {
         Options();

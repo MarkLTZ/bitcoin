@@ -36,6 +36,7 @@ static inline size_t DynamicUsage(const int64_t& v) { return 0; }
 static inline size_t DynamicUsage(const uint64_t& v) { return 0; }
 static inline size_t DynamicUsage(const float& v) { return 0; }
 static inline size_t DynamicUsage(const double& v) { return 0; }
+static inline size_t DynamicUsage(const uint256& v) { return 0; }
 template<typename X> static inline size_t DynamicUsage(X * const &v) { return 0; }
 template<typename X> static inline size_t DynamicUsage(const X * const &v) { return 0; }
 

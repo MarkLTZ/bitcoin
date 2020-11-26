@@ -71,6 +71,7 @@ public:
         consensus.BIP66Enabled = true;
         consensus.CSVHeight = 585000;
         consensus.SegwitHeight = 590000;
+        consensus.SaplingHeight = 190000;
         consensus.MinBIP9WarningHeight = 592016; // segwit activation height + miner confirmation window
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
@@ -200,6 +201,7 @@ public:
         consensus.BIP66Enabled = true;
         consensus.CSVHeight = 5500;
         consensus.SegwitHeight = 6150;
+        consensus.SaplingHeight = 4000;
         consensus.MinBIP9WarningHeight = 8166; // segwit activation height + miner confirmation window
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
@@ -309,6 +311,7 @@ public:
         consensus.BIP66Enabled = false;
         consensus.CSVHeight = 432; // CSV activated on regtest (Used in rpc activation tests)
         consensus.SegwitHeight = 0; // SEGWIT is always activated on regtest unless overridden
+        consensus.SaplingHeight = 0; // SAPLING is always activated on regtest unless overridden
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
 
@@ -426,6 +429,17 @@ void CRegTestParams::UpdateActivationParametersFromArgs(const ArgsManager& args)
             height = std::numeric_limits<int>::max();
         }
         consensus.SegwitHeight = static_cast<int>(height);
+    }
+
+    if (gArgs.IsArgSet("-saplingheight")) {
+        int64_t height = gArgs.GetArg("-saplingheight", consensus.SaplingHeight);
+        if (height < -1 || height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Activation height %ld for sapling is out of valid range. Use -1 to disable sapling.", height));
+        } else if (height == -1) {
+            LogPrintf("Sapling disabled for testing\n");
+            height = std::numeric_limits<int>::max();
+        }
+        consensus.SaplingHeight = static_cast<int>(height);
     }
 
     if (!args.IsArgSet("-vbparams")) return;

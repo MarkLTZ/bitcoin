@@ -40,6 +40,9 @@ static constexpr int64_t TIMESTAMP_WINDOW = BITCOIN_MAX_FUTURE_BLOCK_TIME;
  */
 static constexpr int64_t MAX_BLOCK_TIME_GAP = 90 * 60;
 
+static const int SPROUT_VALUE_VERSION = 1001400;
+static const int SAPLING_VALUE_VERSION = 1010100;
+
 class CBlockFileInfo
 {
 public:
@@ -129,7 +132,7 @@ enum BlockStatus: uint32_t {
     BLOCK_FAILED_CHILD       =   64, //!< descends from failed block
     BLOCK_FAILED_MASK        =   BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
 
-    BLOCK_OPT_WITNESS       =   128, //!< block data in blk*.data was received with a witness-enforcing client
+    BLOCK_OPT_SAPLING        =   128, //!< block data in blk*.data was received with a sapling-enforcing client
 };
 
 /** The block chain is a tree shaped structure starting with the
@@ -176,10 +179,39 @@ public:
     //! Verification status of this block. See enum BlockStatus
     uint32_t nStatus{0};
 
+    //! Branch ID corresponding to the consensus rules used to validate this block.
+    //! Only cached if block validity is BLOCK_VALID_CONSENSUS.
+    //! Persisted at each activation height, memory-only for intervening blocks.
+    Optional<uint32_t> nCachedBranchId{nullopt};
+
+    //! The anchor for the tree state up to the start of this block
+    uint256 hashSproutAnchor{};
+
+    //! (memory only) The anchor for the tree state up to the end of this block
+    uint256 hashSproutRoot{};
+
+    //! Change in value held by the Sprout circuit over this block.
+    //! Will be boost::none for older blocks on old nodes until a reindex has taken place.
+    Optional<CAmount> nSproutValue{nullopt};
+
+    //! (memory only) Total value held by the Sprout circuit up to and including this block.
+    //! Will be boost::none for on old nodes until a reindex has taken place.
+    //! Will be boost::none if nChainTx is zero.
+    Optional<CAmount> nChainSproutValue{nullopt};
+
+    //! Change in value held by the Sapling circuit over this block.
+    //! Not a boost::optional because this was added before Sapling activated, so we can
+    //! rely on the invariant that every block before this was added had nSaplingValue = 0.
+    CAmount nSaplingValue{0};
+
+    //! (memory only) Total value held by the Sapling circuit up to and including this block.
+    //! Will be boost::none if nChainTx is zero.
+    Optional<CAmount> nChainSaplingValue{nullopt};
+
     //! block header
     int32_t nVersion{0};
     uint256 hashMerkleRoot{};
-    uint256 hashReserved{};
+    uint256 hashSaplingRoot{};
     uint32_t nTime{0};
     uint32_t nBits{0};
     uint256 nNonce{};
@@ -187,6 +219,9 @@ public:
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     int32_t nSequenceId{0};
+
+    // The time at which this block was first seen locally.
+    int64_t nArrivalTime{0};
 
     //! (memory only) Maximum nTime in the chain up to and including this block.
     unsigned int nTimeMax{0};
@@ -198,7 +233,7 @@ public:
     explicit CBlockIndex(const CBlockHeader& block)
         : nVersion{block.nVersion},
           hashMerkleRoot{block.hashMerkleRoot},
-          hashReserved{block.hashReserved},
+          hashSaplingRoot{block.hashSaplingRoot},
           nTime{block.nTime},
           nBits{block.nBits},
           nNonce{block.nNonce},
@@ -227,15 +262,15 @@ public:
     CBlockHeader GetBlockHeader() const
     {
         CBlockHeader block;
-        block.nVersion       = nVersion;
+        block.nVersion        = nVersion;
         if (pprev)
             block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.hashReserved   = hashReserved;
-        block.nTime          = nTime;
-        block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        block.nSolution      = nSolution;
+        block.hashMerkleRoot  = hashMerkleRoot;
+        block.hashSaplingRoot = hashSaplingRoot;
+        block.nTime           = nTime;
+        block.nBits           = nBits;
+        block.nNonce          = nNonce;
+        block.nSolution       = nSolution;
         return block;
     }
 
@@ -264,6 +299,11 @@ public:
     }
 
     static constexpr int nMedianTimeSpan = 11;
+
+    int64_t GetBlockArrivalTime() const
+    {
+        return nArrivalTime;
+    }
 
     int64_t GetMedianTimePast() const
     {
@@ -350,16 +390,31 @@ public:
         if (obj.nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO)) READWRITE(VARINT_MODE(obj.nFile, VarIntMode::NONNEGATIVE_SIGNED));
         if (obj.nStatus & BLOCK_HAVE_DATA) READWRITE(VARINT(obj.nDataPos));
         if (obj.nStatus & BLOCK_HAVE_UNDO) READWRITE(VARINT(obj.nUndoPos));
+        if (obj.nStatus & BLOCK_OPT_SAPLING) READWRITE(obj.nCachedBranchId);
+        READWRITE(obj.hashSproutAnchor);
 
         // block header
         READWRITE(obj.nVersion);
         READWRITE(obj.hashPrev);
         READWRITE(obj.hashMerkleRoot);
-        READWRITE(obj.hashReserved);
+        READWRITE(obj.hashSaplingRoot);
         READWRITE(obj.nTime);
         READWRITE(obj.nBits);
         READWRITE(obj.nNonce);
+        READWRITE(obj.nArrivalTime);
         READWRITE(obj.nSolution);
+
+        // Only read/write nSproutValue if the client version used to create
+        // this index was storing them.
+        if ((s.GetType() & SER_DISK) && (obj.nVersion >= SPROUT_VALUE_VERSION)) {
+            READWRITE(obj.nSproutValue);
+        }
+
+        // Only read/write nSaplingValue if the client version used to create
+        // this index was storing them.
+        if ((s.GetType() & SER_DISK) && (obj.nVersion >= SAPLING_VALUE_VERSION)) {
+            READWRITE(obj.nSaplingValue);
+        }
     }
 
     uint256 GetBlockHash() const
@@ -368,7 +423,7 @@ public:
         block.nVersion        = nVersion;
         block.hashPrevBlock   = hashPrev;
         block.hashMerkleRoot  = hashMerkleRoot;
-        block.hashReserved    = hashReserved;
+        block.hashSaplingRoot = hashSaplingRoot;
         block.nTime           = nTime;
         block.nBits           = nBits;
         block.nNonce          = nNonce;

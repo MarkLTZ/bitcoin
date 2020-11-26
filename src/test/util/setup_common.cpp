@@ -169,6 +169,8 @@ TestChain100Setup::TestChain100Setup()
     // CreateAndProcessBlock() does not support building SegWit blocks, so don't activate in these tests.
     // TODO: fix the code to support SegWit blocks.
     gArgs.ForceSetArg("-segwitheight", "-1");
+    // Disable Sapling
+    gArgs.ForceSetArg("-saplingheight", "-1");
     // Need to recreate chainparams
     SelectParams(CBaseChainParams::REGTEST);
 
@@ -254,6 +256,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransa
 TestChain100Setup::~TestChain100Setup()
 {
     gArgs.ForceSetArg("-segwitheight", "-1");
+    gArgs.ForceSetArg("-saplingheight", "-1");
 }
 
 

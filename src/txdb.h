@@ -51,7 +51,9 @@ public:
     explicit CCoinsViewDB(fs::path ldb_path, size_t nCacheSize, bool fMemory, bool fWipe);
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool GetNote(const uint256 &nullifier, Note &note) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
+    bool HaveNote(const uint256 &nullifier) const override;
     uint256 GetBestBlock() const override;
     std::vector<uint256> GetHeadBlocks() const override;
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;

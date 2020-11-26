@@ -20,6 +20,8 @@
 
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';
+static const char DB_NOTE = 'N';
+static const char DB_NOTES = 'n';
 static const char DB_BLOCK_FILES = 'f';
 static const char DB_BLOCK_INDEX = 'b';
 
@@ -51,6 +53,24 @@ struct CoinEntry {
     }
 };
 
+struct NoteEntry {
+    uint256 nullifier;
+    char key;
+    explicit NoteEntry(const uint256 nullifierIn) : nullifier(nullifierIn), key(DB_NOTE)  {}
+
+    template<typename Stream>
+    void Serialize(Stream &s) const {
+        s << key;
+        s << nullifier;
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream& s) {
+        s >> key;
+        s >> nullifier;
+    }
+};
+
 }
 
 CCoinsViewDB::CCoinsViewDB(fs::path ldb_path, size_t nCacheSize, bool fMemory, bool fWipe) : db(ldb_path, nCacheSize, fMemory, fWipe, true)
@@ -61,8 +81,16 @@ bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     return db.Read(CoinEntry(&outpoint), coin);
 }
 
+bool CCoinsViewDB::GetNote(const uint256 &nullifier, Note &note) const {
+    return db.Read(NoteEntry(nullifier), note);
+}
+
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
     return db.Exists(CoinEntry(&outpoint));
+}
+
+bool CCoinsViewDB::HaveNote(const uint256 &nullifier) const {
+    return db.Exists(NoteEntry(nullifier));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
@@ -143,7 +171,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    return db.EstimateSize(DB_COIN, (char)(DB_COIN+1));
+    return db.EstimateSize(DB_COIN, (char)(DB_COIN+1)) +
+           db.EstimateSize(DB_NOTE, (char)(DB_NOTE+1));
 }
 
 CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blocks" / "index", nCacheSize, fMemory, fWipe) {
@@ -262,20 +291,30 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
             if (pcursor->GetValue(diskindex)) {
                 // Construct block index object
                 CBlockIndex* pindexNew = insertBlockIndex(diskindex.GetBlockHash());
-                pindexNew->pprev          = insertBlockIndex(diskindex.hashPrev);
-                pindexNew->nHeight        = diskindex.nHeight;
-                pindexNew->nFile          = diskindex.nFile;
-                pindexNew->nDataPos       = diskindex.nDataPos;
-                pindexNew->nUndoPos       = diskindex.nUndoPos;
-                pindexNew->nVersion       = diskindex.nVersion;
-                pindexNew->hashMerkleRoot = diskindex.hashMerkleRoot;
-                pindexNew->hashReserved   = diskindex.hashReserved;
-                pindexNew->nTime          = diskindex.nTime;
-                pindexNew->nBits          = diskindex.nBits;
-                pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nSolution      = diskindex.nSolution;
-                pindexNew->nStatus        = diskindex.nStatus;
-                pindexNew->nTx            = diskindex.nTx;
+                pindexNew->pprev           = insertBlockIndex(diskindex.hashPrev);
+                pindexNew->nHeight         = diskindex.nHeight;
+                pindexNew->nFile           = diskindex.nFile;
+                pindexNew->nDataPos        = diskindex.nDataPos;
+                pindexNew->nUndoPos        = diskindex.nUndoPos;
+                pindexNew->nVersion        = diskindex.nVersion;
+                pindexNew->hashMerkleRoot  = diskindex.hashMerkleRoot;
+                pindexNew->hashSaplingRoot = diskindex.hashSaplingRoot;
+                pindexNew->nTime           = diskindex.nTime;
+                pindexNew->nBits           = diskindex.nBits;
+                pindexNew->nNonce          = diskindex.nNonce;
+                pindexNew->nArrivalTime    = diskindex.nArrivalTime;
+                pindexNew->nSolution       = diskindex.nSolution;
+                pindexNew->nStatus         = diskindex.nStatus;
+                pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
+                pindexNew->nTx             = diskindex.nTx;
+                pindexNew->nSproutValue    = diskindex.nSproutValue;
+                pindexNew->nSaplingValue   = diskindex.nSaplingValue;
+
+                // Consistency checks
+                auto header = pindexNew->GetBlockHeader();
+                if (header.GetHash() != pindexNew->GetBlockHash())
+                    return error("%s: block header inconsistency detected: on-disk = %s, in-memory = %s",
+                       __func__, diskindex.ToString(), pindexNew->ToString());
 
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams))
                     return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());

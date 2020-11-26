@@ -320,7 +320,7 @@ static void LimitMempoolSize(CTxMemPool& pool, size_t limit, std::chrono::second
     std::vector<COutPoint> vNoSpendsRemaining;
     pool.TrimToSize(limit, &vNoSpendsRemaining);
     for (const COutPoint& removed : vNoSpendsRemaining)
-        ::ChainstateActive().CoinsTip().Uncache(removed);
+        ::ChainstateActive().CoinsTip().UncacheCoin(removed);
 }
 
 static bool IsCurrentForFeeEstimation() EXCLUSIVE_LOCKS_REQUIRED(cs_main)
@@ -1050,7 +1050,7 @@ static bool AcceptToMemoryPoolWithTime(const CChainParams& chainparams, CTxMemPo
         // (`CCoinsViewCache::cacheCoins`).
 
         for (const COutPoint& hashTx : coins_to_uncache)
-            ::ChainstateActive().CoinsTip().Uncache(hashTx);
+            ::ChainstateActive().CoinsTip().UncacheCoin(hashTx);
     }
     // After we've (potentially) uncached entries, ensure our coins cache is still within its size limits
     BlockValidationState state_dummy;
@@ -3156,7 +3156,7 @@ void CChainState::ReceivedBlockTransactions(const CBlock& block, CBlockIndex* pi
     pindexNew->nUndoPos = 0;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     if (IsWitnessEnabled(pindexNew->pprev, consensusParams)) {
-        pindexNew->nStatus |= BLOCK_OPT_WITNESS;
+        pindexNew->nStatus |= BLOCK_OPT_SAPLING;
     }
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
     setDirtyBlockIndex.insert(pindexNew);
@@ -3174,6 +3174,7 @@ void CChainState::ReceivedBlockTransactions(const CBlock& block, CBlockIndex* pi
             {
                 LOCK(cs_nBlockSequenceId);
                 pindex->nSequenceId = nBlockSequenceId++;
+                pindex->nArrivalTime = GetAdjustedTime();
             }
             if (m_chain.Tip() == nullptr || !setBlockIndexCandidates.value_comp()(pindex, m_chain.Tip())) {
                 setBlockIndexCandidates.insert(pindex);
@@ -3273,11 +3274,13 @@ static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& st
     // Check Equihash solution is valid
     if (fCheckPOW) {
         const CChainParams& chainparams = Params();
-        size_t oldSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight());
-        size_t newSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight() - 1);
+        size_t oldSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight() - 1);
+        size_t newSize = chainparams.EquihashSolutionWidth(chainparams.EquihashForkHeight());
+        size_t nSolSize = block.nSolution.size();
 
-        if ((block.nSolution.size() != oldSize) && (block.nSolution.size() != newSize))
-            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-solution-size", "invalid equihash solution size");
+        if ((nSolSize != oldSize) && (nSolSize != newSize))
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-solution-size",
+                                 strprintf("Equihash solution has invalid size: have %d, need [%d, %d]", nSolSize, oldSize, newSize));
 
         if (!CheckEquihashSolution(&block))
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-solution", "invalid equihash solution");
@@ -3478,6 +3481,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     if (block.nVersion < 4)
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
                                  strprintf("rejected nVersion=0x%08x block", block.nVersion));
+
+    // Reject invalid equihash solutions
+    size_t nSolSize = block.nSolution.size();
+    size_t nExpectedSolSize = params.EquihashSolutionWidth(nHeight);
+    if (nSolSize > 0 && nSolSize != nExpectedSolSize)
+        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-equihash-solution",
+                             strprintf("Equihash solution has invalid size: have %d, need %d", nSolSize, nExpectedSolSize));
 
     return true;
 }
@@ -4445,7 +4455,7 @@ bool CChainState::RewindBlockIndex(const CChainParams& params)
     {
         LOCK(cs_main);
         for (const auto& entry : m_blockman.m_block_index) {
-            if (IsWitnessEnabled(entry.second->pprev, params.GetConsensus()) && !(entry.second->nStatus & BLOCK_OPT_WITNESS) && !m_chain.Contains(entry.second)) {
+            if (IsWitnessEnabled(entry.second->pprev, params.GetConsensus()) && !(entry.second->nStatus & BLOCK_OPT_SAPLING) && !m_chain.Contains(entry.second)) {
                 EraseBlockData(entry.second);
             }
         }
@@ -4460,7 +4470,7 @@ bool CChainState::RewindBlockIndex(const CChainParams& params)
             // Although SCRIPT_VERIFY_WITNESS is now generally enforced on all
             // blocks in ConnectBlock, we don't need to go back and
             // re-download/re-verify blocks from before segwit actually activated.
-            if (IsWitnessEnabled(m_chain[nHeight - 1], params.GetConsensus()) && !(m_chain[nHeight]->nStatus & BLOCK_OPT_WITNESS)) {
+            if (IsWitnessEnabled(m_chain[nHeight - 1], params.GetConsensus()) && !(m_chain[nHeight]->nStatus & BLOCK_OPT_SAPLING)) {
                 break;
             }
             nHeight++;

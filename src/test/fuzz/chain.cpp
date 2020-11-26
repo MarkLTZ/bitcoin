@@ -50,7 +50,7 @@ void test_one_input(const std::vector<uint8_t>& buffer)
             BlockStatus::BLOCK_FAILED_VALID,
             BlockStatus::BLOCK_FAILED_CHILD,
             BlockStatus::BLOCK_FAILED_MASK,
-            BlockStatus::BLOCK_OPT_WITNESS,
+            BlockStatus::BLOCK_OPT_SAPLING,
         });
         if (block_status & ~BLOCK_VALID_MASK) {
             continue;

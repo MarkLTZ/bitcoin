@@ -478,6 +478,8 @@ libbitcoin_consensus_a_SOURCES = \
   primitives/block.h \
   primitives/transaction.cpp \
   primitives/transaction.h \
+  proof_verifier.cpp \
+  proof_verifier.h \
   pubkey.cpp \
   pubkey.h \
   script/bitcoinconsensus.cpp \
