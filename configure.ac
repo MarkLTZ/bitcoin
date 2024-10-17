@@ -130,6 +130,34 @@ AC_PATH_TOOL([OBJCOPY], [objcopy])
 AC_PATH_PROG([DOXYGEN], [doxygen])
 AM_CONDITIONAL([HAVE_DOXYGEN], [test -n "$DOXYGEN"])
 
+AC_PATH_PROG([CARGO], [cargo], [none])
+if test "$CARGO" = "none"; then
+  AC_MSG_WARN([cargo not found.])
+fi
+
+AC_PATH_PROG([RUSTC], [rustc], [none])
+if test "$RUSTC" = "none"; then
+  AC_MSG_WARN([rustc not found.])
+fi
+
+dnl Find the additional lib (if any) responsible for handling
+dnl dlopen/dlsym/etc.
+TEMP_LIBS="$LIBS"
+LIBS=
+AC_SEARCH_LIBS([dlsym],[dl])
+DL_LIBS="$LIBS"
+LIBS="$TEMP_LIBS"
+
+case $host in
+  ${host_cpu}-w64-mingw*) RUST_TARGET=${host_cpu}-pc-windows-gnu ;;
+  ${host_cpu}-pc-linux*) RUST_TARGET=${host_cpu}-unknown-${host_os} ;;
+  ${host_cpu}-apple-darwin*) RUST_TARGET=${host_cpu}-apple-darwin ;;
+  riscv64-unknown-linux-gnu*) RUST_TARGET=riscv64gc-unknown-linux-gnu ;;
+  arm-linux-gnueabihf*) RUST_TARGET=arm-unknown-linux-gnueabihf ;;
+  powerpc64-linux-gnu*) RUST_TARGET=powerpc64-unknown-linux-gnu ;;
+  *) RUST_TARGET=${host} ;;
+esac
+
 AC_ARG_ENABLE([wallet],
   [AS_HELP_STRING([--disable-wallet],
   [disable wallet (enabled by default)])],
@@ -1661,6 +1689,8 @@ AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
 AC_SUBST(NATPMP_CPPFLAGS)
 AC_SUBST(NATPMP_LIBS)
+AC_SUBST(DL_LIBS)
+AC_SUBST(RUST_TARGET)
 AC_SUBST(HAVE_FDATASYNC)
 AC_SUBST(HAVE_FULLFSYNC)
 AC_SUBST(HAVE_O_CLOEXEC)
@@ -1747,6 +1777,9 @@ echo "  werror          = $enable_werror"
 echo
 echo "  target os       = $host_os"
 echo "  build os        = $build_os"
+echo
+echo "  rust target     = $RUST_TARGET"
+echo "  host            = $host"
 echo
 echo "  CC              = $CC"
 echo "  CFLAGS          = $PTHREAD_CFLAGS $SANITIZER_CFLAGS $CFLAGS"

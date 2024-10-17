@@ -161,6 +161,37 @@ esac
 export TAR_OPTIONS="--owner=0 --group=0 --numeric-owner --mtime='@${SOURCE_DATE_EPOCH}' --sort=name"
 export TZ="UTC"
 
+###########################
+# Setting the Rust Target #
+###########################
+
+# Needed for rustup, cargo and rustc
+export LD_LIBRARY_PATH=$LIBRARY_PATH
+
+echo "HOST=${HOST}"
+case "$HOST" in
+    x86_64-linux-gnu)     RUST_TARGET="x86_64-unknown-linux-gnu" ;;
+    arm-linux-gnueabihf)  RUST_TARGET="arm-unknown-linux-gnueabihf" ;;
+    aarch64-linux-gnu)    RUST_TARGET="aarch64-unknown-linux-gnu" ;;
+    powerpc64-linux-gnu)  RUST_TARGET="powerpc64-unknown-linux-gnu" ;;
+    riscv64-linux-gnu)    RUST_TARGET="riscv64gc-unknown-linux-gnu" ;;
+    x86_64-w64-mingw32)   RUST_TARGET="x86_64-pc-windows-gnu" ;;
+    x86_64-apple-darwin)  RUST_TARGET="x86_64-apple-darwin" ;;
+    arm64-apple-darwin)   RUST_TARGET="aarch64-apple-darwin" ;;
+esac
+
+# Download and install rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# shellcheck disable=SC1091
+source "$HOME/.cargo/env"
+
+# Install the stable Rust toolchain
+rustup install stable
+
+# Add the specified Rust target to the toolchain
+rustup target add "${RUST_TARGET}"
+
 ####################
 # Depends Building #
 ####################
@@ -183,7 +214,6 @@ case "$HOST" in
         # Unset now that Qt is built
         unset C_INCLUDE_PATH
         unset CPLUS_INCLUDE_PATH
-        unset LIBRARY_PATH
         ;;
 esac
 

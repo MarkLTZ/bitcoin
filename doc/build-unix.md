@@ -44,7 +44,7 @@ Finally, clang (often less resource hungry) can be used instead of gcc, which is
 
 Build requirements:
 
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils python3
+    sudo apt-get install build-essential libtool autotools-dev automake pkg-config bsdmainutils python3 rustc cargo
 
 Now, you can either build from self-compiled [depends](#dependencies) or install the required dependencies:
 
@@ -101,7 +101,7 @@ built by default.
 
 Build requirements:
 
-    sudo dnf install gcc-c++ libtool make autoconf automake python3
+    sudo dnf install gcc-c++ libtool make autoconf automake python3 rust cargo
 
 Now, you can either build from self-compiled [depends](#dependencies) or install the required dependencies:
 

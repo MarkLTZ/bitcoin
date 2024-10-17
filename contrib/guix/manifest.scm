@@ -7,6 +7,7 @@
              (gnu packages commencement)
              (gnu packages compression)
              (gnu packages cross-base)
+             (gnu packages curl)
              (gnu packages file)
              (gnu packages gawk)
              (gnu packages gcc)
@@ -516,6 +517,7 @@ inspecting signatures in Mach-O binaries.")
         moreutils
         ;; Compression and archiving
         tar
+        bzip2
         gzip
         xz
         ;; Build tools
@@ -531,16 +533,21 @@ inspecting signatures in Mach-O binaries.")
         ;; Git
         git-minimal
         ;; Tests
-        python-lief)
+        python-lief
+        ;; Web
+        curl
+        nss-certs)
   (let ((target (getenv "HOST")))
     (cond ((string-suffix? "-mingw32" target)
            (list zip
+                 zlib
                  (make-mingw-pthreads-cross-toolchain "x86_64-w64-mingw32")
                  nsis-x86_64
                  nss-certs
                  osslsigncode))
           ((string-contains target "-linux-")
            (list bison
+                 zlib
                  (list gcc-toolchain-12 "static")
                  (make-bitcoin-cross-toolchain target)))
           ((string-contains target "darwin")
