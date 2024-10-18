@@ -98,9 +98,9 @@ class RPCBindTest(BitcoinTestFramework):
         if not self.options.run_nonloopback:
             self._run_loopback_tests()
             if self.options.run_ipv4:
-                self.run_invalid_bind_test(['127.0.0.1'], ['127.0.0.1:notaport', '127.0.0.1:-18443', '127.0.0.1:0', '127.0.0.1:65536'])
+                self.run_invalid_bind_test(['127.0.0.1'], ['127.0.0.1:notaport', '127.0.0.1:-49442', '127.0.0.1:0', '127.0.0.1:65536'])
             if self.options.run_ipv6:
-                self.run_invalid_bind_test(['[::1]'], ['[::1]:notaport', '[::1]:-18443', '[::1]:0', '[::1]:65536'])
+                self.run_invalid_bind_test(['[::1]'], ['[::1]:notaport', '[::1]:-49442', '[::1]:0', '[::1]:65536'])
         if not self.options.run_ipv4 and not self.options.run_ipv6:
             self._run_nonloopback_tests()
 
